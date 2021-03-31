@@ -1,0 +1,97 @@
+#import library
+library(dplyr)
+library(ggplot2)
+library(choroplethr)
+library(choroplethrMaps)
+library(plotly)
+library(leaflet)
+library(readr)
+library(shiny)
+
+getwd()
+setwd("F:/Monash_S4/FIT5120/Iteration1_visualisation")
+getwd()
+
+#get the datasets ready
+bridge_dataset <- read.csv("bridge.csv",stringsAsFactors=FALSE)
+truckable_dataset1 <- read.csv("filtered_structured_data2_set2.csv",stringsAsFactors=FALSE)
+
+#========================================================================
+
+#shiny
+#UI
+ui <- fluidPage(
+  titlePanel("The places you can access based on your selection."),
+  sidebarLayout(
+    position = 'right',
+    sidebarPanel(
+      selectInput("selected_road",
+                  "Enter your truck's approximate height (m)",
+                  choice=c(3,4,5,6,7,8), 
+                  selected='Between 5.5m and 5.9m'),
+      #actionButton
+     # actionButton('check','Check')
+      
+    ),
+    mainPanel(leafletOutput('mymap'),)
+            #  plotOutput('linechart'))
+  )
+)
+
+
+#Server
+server <- function(input,output,session){
+  
+  data_filter <- reactive({
+    event <- input$mymap_marker_click
+    if(!is.null(event)){
+      truckable_dataset1[truckable_dataset1$latitude==event$lat & truckable_dataset1$longitude==event$lng,] %>% 
+        group_by(ROAD_NAME) %>% summarise(Height_Restrictions = mean(HV_MIN))
+    }
+  })
+  
+  #=====================================
+  observeEvent(input$selected_road,
+               output$mymap <- renderLeaflet({
+                 if(input$selected_road==''){output$mymap <- renderLeaflet({ 
+                   
+                   #truckable_dataset1$Scale <- rescale(truckable_dataset1$HV_MIN, to=c(1,2))
+                   leaflet(truckable_dataset1) %>%
+                     addTiles() %>%
+                     addCircleMarkers(~LONGITUDE,~LATITUDE,#radius = ~Scale,#popup = ~as.character(Hourly_counts1),
+                                      popup = paste('Road Name: ',truckable_dataset1$ROAD_NAME,"</br>",
+                                                    "Height restriction: ", truckable_dataset1$HV_MIN),
+                                      label = ~as.character(ROAD_NAME))
+                 })}
+                 else{
+                 truckable_dataset1 <- filter(truckable_dataset1,truckable_dataset1$HV_MIN>=input$selected_road)
+                 leaflet(truckable_dataset1) %>%
+                   addTiles() %>%
+                   addCircleMarkers(~LONGITUDE,~LATITUDE,#radius = ~Scale,#popup = ~as.character(Hourly_counts1),
+                                    popup = paste('Road Name: ',truckable_dataset1$ROAD_NAME,"</br>",
+                                                  "Height restriction: ", truckable_dataset1$HV_MIN),
+                                    label = ~as.character(ROAD_NAME))}
+               }))
+  
+ 
+  
+ #=====================================  
+  
+  #map
+  #output$mymap <- renderLeaflet({ 
+    
+    #truckable_dataset1$Scale <- rescale(truckable_dataset1$HV_MIN, to=c(1,2))
+  #  leaflet(truckable_dataset1) %>%
+  #    addTiles() %>%
+  #    addCircleMarkers(~LONGITUDE,~LATITUDE,#radius = ~Scale,#popup = ~as.character(Hourly_counts1),
+  #                     popup = paste('Location: ',truckable_dataset1$ROAD_NAME,"</br>",
+  #                                   "Average Counts: ", truckable_dataset1$HV_MIN),
+  #                     label = ~as.character(ROAD_NAME))
+ # })
+ 
+  
+}
+
+
+#ShinyApp
+shinyApp(ui, server)
